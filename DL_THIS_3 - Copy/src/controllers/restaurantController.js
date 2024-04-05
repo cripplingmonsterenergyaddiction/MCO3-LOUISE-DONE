@@ -356,48 +356,163 @@ module.exports = function (app, app_data) {
   const createArray = (N) => {
     return [...Array(N).keys()].map((i) => i + 1);
   };
-app.get("/userProfile", async (req, res) => {
-  try {
-    const username = loginInfo.username;
-    // Fetch data for comments, users, and restaurants concurrently
-    const [comments, users, restaurants] = await Promise.all([
-      getData("comments", { name: username }), // Filter comments by name
-      getData("users", { username: username }), // Filter users by username
-      getData("restaurants", {}), // Fetch all restaurants
-    ]);
-
-    const createArrays = (comment) => {
-      comment["food-stars"] = createArray(comment["food-rating"]);
-      comment["service-stars"] = createArray(comment["service-rating"]);
-      comment["ambiance-stars"] = createArray(comment["ambiance-rating"]);
-      comment["overall-stars"] = createArray(comment["overall-rating"]);
-    };
-
-    const createRestaurantArrays = (restaurant) => {
-      restaurant["rating-stars"] = createArray(restaurant["main_rating"]);
-    };
-
-    comments.forEach(createArrays);
-    restaurants.forEach(createRestaurantArrays);
-    console.log("These are the users");
-    console.log(users);
-    console.log("Data fetched successfully");
-
-    // Render user profile page with data
-    res.render("user-profile", {
-      layout: "user-layout",
-      title: "User Profile",
-      commentData: comments,
-      userData: [users[0]], // Assuming users variable is defined somewhere
-      restoData: restaurants,
-      loginData: loginInfo
+  app.get("/userProfile", async (req, res) => {
+    try {
+      const username = loginInfo.username;
+      // Fetch data for comments, users, and restaurants concurrently
+      const [comments, users, restaurants] = await Promise.all([
+        getData("comments", { name: username }), // Filter comments by name
+        getData("users", { username: username }), // Filter users by username
+        getData("restaurants", {}), // Fetch all restaurants
+      ]);
+  
+      const createArrays = (comment) => {
+        comment["food-stars"] = createArray(comment["food-rating"]);
+        comment["service-stars"] = createArray(comment["service-rating"]);
+        comment["ambiance-stars"] = createArray(comment["ambiance-rating"]);
+        comment["overall-stars"] = createArray(comment["overall-rating"]);
+      };
+  
+      const createRestaurantArrays = (restaurant) => {
+        restaurant["rating-stars"] = createArray(restaurant["main_rating"]);
+      };
+  
+      comments.forEach(createArrays);
+      restaurants.forEach(createRestaurantArrays);
+      console.log("These are the users");
+      console.log(users);
+      console.log("Data fetched successfully");
+  
+      // Render user profile page with data
+      res.render("user-profile", {
+        layout: "user-layout",
+        title: "User Profile",
+        commentData: comments,
+        userData: [users[0]], // Assuming users variable is defined somewhere
+        restoData: restaurants,
+        loginData: loginInfo
+      });
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      res.status(500).send("Error fetching data");
+    }
+  });
+  
+  app.post('/update-comment', function (req, resp) {
+    console.log("RECEIVED", req.body);
+  
+    // Parse the received ratings data
+    const ratingsData = req.body;
+  
+    // Initialize objects to store ratings for each category
+    const foodRatings = {};
+    const serviceRatings = {};
+    const ambianceRatings = {};
+    const overallRatings = {};
+  
+    // Iterate over the keys of ratingsData
+    for (const key in ratingsData) {
+        // Check the category of the rating based on the key prefix
+        if (key.startsWith('food-')) {
+            const id = key.slice(5); // Remove the 'food-' prefix to get the id
+            foodRatings[id] = ratingsData[key];
+        } else if (key.startsWith('service-')) {
+            const id = key.slice(8); // Remove the 'service-' prefix to get the id
+            serviceRatings[id] = ratingsData[key];
+        } else if (key.startsWith('ambiance-')) {
+            const id = key.slice(9); // Remove the 'ambiance-' prefix to get the id
+            ambianceRatings[id] = ratingsData[key];
+        } else if (key.startsWith('overall-')) {
+            const id = key.slice(8); // Remove the 'overall-' prefix to get the id
+            overallRatings[id] = ratingsData[key];
+        }
+    }
+  
+    // Extract document ID, title, and description
+    const { id, title, desc } = req.body;
+  
+    // Update the document in the database
+    commentModel.findByIdAndUpdate(id, {
+        title,
+        content: desc,
+        foodRating: foodRatings[0],
+        serviceRating: serviceRatings[0],
+        ambianceRating: ambianceRatings[0],
+        overallRating: overallRatings[0]
+    }, { new: true })
+    .then(function (updateResult) {
+        if (!updateResult) {
+            console.log("No matching document found." + id);
+            return resp.status(404).send("No matching document found" + id);
+        }
+  
+        console.log("Update successful");
+        // Send the updated comment data as JSON response
+        resp.json(updateResult);
+    })
+    .catch(function (error) {
+        console.error("Error updating comment:", error);
+        resp.status(500).send("Error updating comment");
     });
-  } catch (error) {
-    console.error("Error fetching data:", error);
-    res.status(500).send("Error fetching data");
-  }
-});
-
+  });
+  
+  app.get("/chimmy", function (req, resp) {
+    // Connect to MongoDB
+    MongoClient.connect(uri)
+      .then((client) => {
+        console.log("Connected to MongoDB");
+        const dbo = client.db("eggyDB"); // Get the database object
+        const collName = dbo.collection("comments"); // Get the collection
+        const cursor = collName.find({}); // Find all documents in the collection
+  
+        const col2ndName = dbo.collection("restaurants");
+        const cursor2nd = col2ndName.find({});
+  
+        Promise.all([cursor.toArray(), cursor2nd.toArray()])
+          .then(function ([comments, restaurants]) {
+            const createArrays = (comment) => {
+              comment["food-stars"] = createArray(comment["food-rating"]);
+              comment["service-stars"] = createArray(comment["service-rating"]);
+              comment["ambiance-stars"] = createArray(
+                comment["ambiance-rating"]
+              );
+              comment["overall-stars"] = createArray(comment["overall-rating"]);
+            };
+            const createRestaurantArrays = (restaurant) => {
+              restaurant["rating-stars"] = createArray(
+                restaurant["main_rating"]
+              );
+            };
+  
+            comments.forEach(createArrays);
+            restaurants.forEach(createRestaurantArrays);
+            console.log(comments[0]);
+            console.log(restaurants);
+            console.log("Length Here");
+            console.log(restaurants.length);
+            console.log("Data fetched successfully");
+  
+            // Split the displayRestos array into two arrays
+            resp.render("estb-review", {
+              layout: "estb-review-layout",
+              title: "Review",
+              commentData: comments,
+              restoData: [restaurants[0]],
+            });
+          })
+          .catch(function (error) {
+            console.error("Error fetching data:", error);
+            resp.status(500).send("Error fetching data");
+          })
+          .finally(() => {
+            client.close(); // Close the MongoDB client after fetching data
+          });
+      })
+      .catch((err) => {
+        console.error("Error connecting to MongoDB:", err);
+        resp.status(500).send("Error connecting to MongoDB");
+      });
+  });
 
 
 // Check if the directory exists, create it if it doesn't
@@ -454,8 +569,6 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage });
-
-
 
 
 app.post('/update-profile', upload.single('img'), async (req, res) => {

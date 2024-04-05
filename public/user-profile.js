@@ -64,6 +64,59 @@ function closeSignup() {
   
   return false; // Prevent default form submission
 }
+// Adjusted function in user-profile.js for profile updates
+function updateProfile(event) {
+  event.preventDefault(); // Prevent default form submission
+
+  // Use FormData to automatically capture form data, including files
+  const formData = new FormData(document.getElementById('editProfileForm'));
+
+  // Since you're uploading a file, you should not set 'Content-Type' header manually.
+  // The browser will set it to 'multipart/form-data' with the correct boundary.
+  fetch('/update-profile', {
+    method: 'POST',
+    body: formData, // Send FormData directly
+  })
+  .then(response => response.json())
+  .then(data => {
+    if (data.success) {
+      alert('Profile updated successfully!');
+      window.location.href = '/userProfile'; 
+    } else {
+      alert(data.message || 'Failed to update profile. Please try again.');
+    }
+  })
+  .catch((error) => {
+    console.error('Error:', error);
+  });
+}
+
+// Adjusted to ensure the form submit event is correctly bound to the updateProfile function
+document.getElementById('editProfileForm').addEventListener('submit', updateProfile);
+
+document.getElementById('deleteAccountBtn').addEventListener('click', function() {
+  var confirmDeletion = confirm("Are you sure you want to delete your account? This action cannot be undone.");
+  if (confirmDeletion) {
+      fetch('/delete-account', {
+          method: 'POST',
+      })
+      .then(response => response.json())
+      .then(data => {
+          if (data.success) {
+              alert('Account deleted successfully.');
+              // Redirect based on the response from the server
+              window.location.href = data.redirectTo; 
+          } else {
+              alert('Failed to delete account. Please try again.');
+          }
+      })
+      .catch((error) => {
+          console.error('Error:', error);
+          alert('An error occurred. Please try again.');
+      });
+  }
+});
+
 
 function addModalHandlers(buttonClass, modalClass, closeClass, saveClass) {
   const buttons = document.querySelectorAll(buttonClass);
@@ -124,26 +177,6 @@ function sendDataToServer(formData) {
     });
 }
 
-// Function to update comment details in the DOM
-function updateCommentDetails(comment) {
-    const commentTitleElement = document.getElementById('title');
-    const commentDescElement = document.getElementById('desc');
-
-    // Update title and description elements with new data
-    commentTitleElement.textContent = comment.title;
-    commentDescElement.textContent = comment.desc;
-}
-
-// Function to handle form submission response
-function handleFormResponse(response) {
-    if (response.ok) {
-        response.json().then(updateCommentDetails); // Update comment details in the DOM
-    } else {
-        // Handle error response if needed
-        console.error('Failed to update comment:', response.statusText);
-    }
-}
-
 function handleSubmit(event) {
   event.preventDefault(); // Prevent default form submission
 
@@ -190,23 +223,8 @@ function handleSubmit(event) {
   const modalId = form.dataset.modalId; // Retrieve the modal ID from the data attribute
   console.log("MODAL ID: ", modalId); 
   modals[modalId].close();
-
-  // Fetch updated comment data from the server
-  fetch('/update-comment', {
-      method: 'POST',
-      headers: {
-          'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-          id: data.id
-      })
-  })
-  .then(handleFormResponse) // Handle response
-  .catch(error => {
-      // Handle fetch error if needed
-      console.error('Error updating comment:', error);
-  });
 }
+
 
 // Function to handle star click
 function handleStarClick(stars, index, ratingType) {
@@ -241,3 +259,5 @@ const forms = document.querySelectorAll('form[name="update-comment"]');
 forms.forEach(form => {
     form.addEventListener('submit', handleSubmit);
 });
+
+

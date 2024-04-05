@@ -5,6 +5,8 @@
 // npm i express express-handlebars body-parser mongoose
 // npm i express-validator
 // npm i install bcrypt 
+// npm i install multer
+// npm i express express-handlebars body-parser multer
 
 /*Imports */
 const express = require("express");
@@ -13,7 +15,7 @@ const bodyParser = require("body-parser");
 const exphbs = require("express-handlebars");
 const fs = require("fs");
 const app = express();
-const PORT = 1122;
+const PORT = 3000;
 
 const rawData = fs.readFileSync("src/models/Restaurant.json");
 const resto = JSON.parse(rawData);
